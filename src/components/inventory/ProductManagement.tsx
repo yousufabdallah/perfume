@@ -84,7 +84,7 @@ const ProductManagement = ({ branchId }: ProductManagementProps) => {
   };
 
   useEffect(() => {
-    if (!selectedBranch && branches.length > 0) {
+    if ((!selectedBranch || selectedBranch === "") && branches.length > 0) {
       setSelectedBranch(branches[0].id);
     }
   }, [branches, selectedBranch]);
@@ -112,12 +112,25 @@ const ProductManagement = ({ branchId }: ProductManagementProps) => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
+      if (!selectedBranch) {
+        setProducts([]);
+        return;
+      }
+
       // First get all products
       const { data: productsData, error: productsError } = await supabase
         .from("products")
         .select("*");
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error("Products fetch error:", productsError);
+        throw productsError;
+      }
+
+      if (!productsData || productsData.length === 0) {
+        setProducts([]);
+        return;
+      }
 
       // Then get inventory for the selected branch
       const { data: inventoryData, error: inventoryError } = await supabase
@@ -125,11 +138,14 @@ const ProductManagement = ({ branchId }: ProductManagementProps) => {
         .select("*")
         .eq("branch_id", selectedBranch);
 
-      if (inventoryError) throw inventoryError;
+      if (inventoryError) {
+        console.error("Inventory fetch error:", inventoryError);
+        throw inventoryError;
+      }
 
       // Map inventory to products
       const productsWithInventory = productsData.map((product) => {
-        const inventoryItem = inventoryData.find(
+        const inventoryItem = inventoryData?.find(
           (item) => item.product_id === product.id,
         );
         return {
@@ -152,6 +168,7 @@ const ProductManagement = ({ branchId }: ProductManagementProps) => {
       setProducts(filteredProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -349,19 +366,29 @@ const AddProductDialog = ({ branchId, onSuccess }: AddProductDialogProps) => {
     setIsLoading(true);
 
     try {
+      if (!branchId) {
+        throw new Error("يجب اختيار الفرع أولاً");
+      }
+
       // First create the product
       const { data: productData, error: productError } = await supabase
         .from("products")
         .insert({
           name,
           sku: sku || null,
-          price: parseFloat(price),
-          cost: parseFloat(cost),
+          price: parseFloat(price) || 0,
+          cost: parseFloat(cost) || 0,
+          description: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (productError) throw productError;
+      if (productError) {
+        console.error("Product error:", productError);
+        throw productError;
+      }
 
       // Then create the inventory entry
       const { error: inventoryError } = await supabase
@@ -369,17 +396,23 @@ const AddProductDialog = ({ branchId, onSuccess }: AddProductDialogProps) => {
         .insert({
           branch_id: branchId,
           product_id: productData.id,
-          quantity: parseInt(quantity),
+          quantity: parseInt(quantity) || 0,
           min_quantity: minQuantity ? parseInt(minQuantity) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
 
-      if (inventoryError) throw inventoryError;
+      if (inventoryError) {
+        console.error("Inventory error:", inventoryError);
+        throw inventoryError;
+      }
 
       setOpen(false);
       resetForm();
       onSuccess();
     } catch (error) {
       console.error("Error adding product:", error);
+      alert("حدث خطأ أثناء إضافة المنتج. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoading(false);
     }
@@ -531,33 +564,47 @@ const UpdateStockDialog = ({
     setIsLoading(true);
 
     try {
+      if (!branchId) {
+        throw new Error("يجب اختيار الفرع أولاً");
+      }
+
       if (product.inventory) {
         // Update existing inventory
         const { error } = await supabase
           .from("inventory")
           .update({
-            quantity: parseInt(quantity),
+            quantity: parseInt(quantity) || 0,
             min_quantity: minQuantity ? parseInt(minQuantity) : null,
+            updated_at: new Date().toISOString(),
           })
           .eq("id", product.inventory.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error("Inventory update error:", error);
+          throw error;
+        }
       } else {
         // Create new inventory entry
         const { error } = await supabase.from("inventory").insert({
           branch_id: branchId,
           product_id: product.id,
-          quantity: parseInt(quantity),
+          quantity: parseInt(quantity) || 0,
           min_quantity: minQuantity ? parseInt(minQuantity) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error("Inventory create error:", error);
+          throw error;
+        }
       }
 
       setOpen(false);
       onSuccess();
     } catch (error) {
       console.error("Error updating stock:", error);
+      alert("حدث خطأ أثناء تحديث المخزون. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoading(false);
     }
@@ -756,6 +803,10 @@ const RequestStockDialog = ({
     setIsLoading(true);
 
     try {
+      if (!branchId || !targetBranch) {
+        throw new Error("يجب اختيار الفروع أولاً");
+      }
+
       // Create transfer request
       const { data: transfer, error: transferError } = await supabase
         .from("inventory_transfers")
@@ -766,11 +817,16 @@ const RequestStockDialog = ({
           requested_by: userId || "00000000-0000-0000-0000-000000000000",
           request_date: new Date().toISOString(),
           notes: `طلب نقل ${product.name} من فرع آخر`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (transferError) throw transferError;
+      if (transferError) {
+        console.error("Transfer error:", transferError);
+        throw transferError;
+      }
 
       // Add transfer item
       const { error: itemError } = await supabase
@@ -778,15 +834,21 @@ const RequestStockDialog = ({
         .insert({
           transfer_id: transfer.id,
           product_id: product.id,
-          quantity: parseInt(quantity),
+          quantity: parseInt(quantity) || 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error("Transfer item error:", itemError);
+        throw itemError;
+      }
 
       setOpen(false);
       onSuccess();
     } catch (error) {
       console.error("Error creating transfer request:", error);
+      alert("حدث خطأ أثناء إنشاء طلب النقل. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoading(false);
     }

@@ -72,7 +72,7 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
   const [transactionId, setTransactionId] = useState("");
 
   useEffect(() => {
-    if (!selectedBranch && branches.length > 0) {
+    if ((!selectedBranch || selectedBranch === "") && branches.length > 0) {
       setSelectedBranch(branches[0].id);
     }
   }, [branches, selectedBranch]);
@@ -100,12 +100,25 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
+      if (!selectedBranch) {
+        setProducts([]);
+        return;
+      }
+
       // First get all products
       const { data: productsData, error: productsError } = await supabase
         .from("products")
         .select("*");
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error("Products fetch error:", productsError);
+        throw productsError;
+      }
+
+      if (!productsData || productsData.length === 0) {
+        setProducts([]);
+        return;
+      }
 
       // Then get inventory for the selected branch
       const { data: inventoryData, error: inventoryError } = await supabase
@@ -113,11 +126,14 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
         .select("*")
         .eq("branch_id", selectedBranch);
 
-      if (inventoryError) throw inventoryError;
+      if (inventoryError) {
+        console.error("Inventory fetch error:", inventoryError);
+        throw inventoryError;
+      }
 
       // Map inventory to products
       const productsWithInventory = productsData.map((product) => {
-        const inventoryItem = inventoryData.find(
+        const inventoryItem = inventoryData?.find(
           (item) => item.product_id === product.id,
         );
         return {
@@ -134,6 +150,7 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
       setProducts(availableProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -214,6 +231,10 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
   const handleCheckout = async () => {
     setIsProcessing(true);
     try {
+      if (!selectedBranch) {
+        throw new Error("يجب اختيار الفرع أولاً");
+      }
+
       // 1. Create financial transaction
       const { data: transactionData, error: transactionError } = await supabase
         .from("financial_transactions")
@@ -225,23 +246,37 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
           reference_number: `POS-${Date.now()}`,
           transaction_date: new Date().toISOString(),
           created_by: user?.id || "00000000-0000-0000-0000-000000000000", // Use actual user ID if available
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (transactionError) throw transactionError;
+      if (transactionError) {
+        console.error("Transaction error:", transactionError);
+        throw transactionError;
+      }
 
       // 2. Update inventory for each product
       for (const item of cart) {
         if (item.product.inventory) {
-          const newQuantity = item.product.inventory.quantity - item.quantity;
+          const newQuantity = Math.max(
+            0,
+            item.product.inventory.quantity - item.quantity,
+          );
 
           const { error: inventoryError } = await supabase
             .from("inventory")
-            .update({ quantity: newQuantity })
+            .update({
+              quantity: newQuantity,
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", item.product.inventory.id);
 
-          if (inventoryError) throw inventoryError;
+          if (inventoryError) {
+            console.error("Inventory update error:", inventoryError);
+            throw inventoryError;
+          }
         }
       }
 
@@ -252,6 +287,7 @@ const POSSystem = ({ branchId }: POSSystemProps) => {
       fetchProducts(); // Refresh products to update inventory
     } catch (error) {
       console.error("Error processing checkout:", error);
+      alert("حدث خطأ أثناء إتمام عملية الشراء. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsProcessing(false);
     }

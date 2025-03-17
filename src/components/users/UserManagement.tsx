@@ -105,6 +105,29 @@ const UserManagement = ({
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validate general manager email
+      if (
+        formData.role === "general_manager" &&
+        formData.email !== "yousufabdallah2000@gmail.com"
+      ) {
+        throw new Error(
+          "Only yousufabdallah2000@gmail.com can be the general manager",
+        );
+      }
+
+      // Check if a general manager already exists when trying to create one
+      if (formData.role === "general_manager") {
+        const { data: existingGM, error: gmError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("role", "general_manager");
+
+        if (gmError) throw gmError;
+        if (existingGM && existingGM.length > 0) {
+          throw new Error("A general manager already exists");
+        }
+      }
+
       // Call the create_user_with_role function
       const { data, error } = await supabase.rpc("create_user_with_role", {
         email: formData.email,
@@ -118,8 +141,9 @@ const UserManagement = ({
       setAddDialogOpen(false);
       resetForm();
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding user:", error);
+      alert(`Error: ${error.message || "Failed to add user"}`);
     }
   };
 
@@ -128,6 +152,43 @@ const UserManagement = ({
     if (!currentUser) return;
 
     try {
+      // Prevent changing role to general manager if email is not the designated one
+      if (
+        formData.role === "general_manager" &&
+        currentUser.email !== "yousufabdallah2000@gmail.com"
+      ) {
+        throw new Error(
+          "Only yousufabdallah2000@gmail.com can be the general manager",
+        );
+      }
+
+      // Check if a general manager already exists when trying to change role to general manager
+      if (
+        formData.role === "general_manager" &&
+        currentUser.role !== "general_manager"
+      ) {
+        const { data: existingGM, error: gmError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("role", "general_manager");
+
+        if (gmError) throw gmError;
+        if (existingGM && existingGM.length > 0) {
+          throw new Error("A general manager already exists");
+        }
+      }
+
+      // Prevent changing the general manager's role if it's the designated email
+      if (
+        currentUser.email === "yousufabdallah2000@gmail.com" &&
+        currentUser.role === "general_manager" &&
+        formData.role !== "general_manager"
+      ) {
+        throw new Error(
+          "Cannot change the role of the designated general manager",
+        );
+      }
+
       const { error } = await supabase
         .from("users")
         .update({
@@ -141,8 +202,9 @@ const UserManagement = ({
       setEditDialogOpen(false);
       resetForm();
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user:", error);
+      alert(`Error: ${error.message || "Failed to update user"}`);
     }
   };
 
@@ -150,6 +212,14 @@ const UserManagement = ({
     if (!currentUser) return;
 
     try {
+      // Prevent deleting the general manager if it's the designated email
+      if (
+        currentUser.email === "yousufabdallah2000@gmail.com" &&
+        currentUser.role === "general_manager"
+      ) {
+        throw new Error("Cannot delete the designated general manager");
+      }
+
       // In a real app, you would need to delete the auth user as well
       // This would typically be done via a server function
       const { error } = await supabase
@@ -160,8 +230,9 @@ const UserManagement = ({
       if (error) throw error;
       setDeleteDialogOpen(false);
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
+      alert(`Error: ${error.message || "Failed to delete user"}`);
     }
   };
 
