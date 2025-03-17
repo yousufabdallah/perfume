@@ -19,11 +19,15 @@ const AuthContext = createContext<AuthContextType>({
   error: null,
 });
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  return useContext(AuthContext);
+}
 
-const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+export default function AuthProvider({
   children,
-}) => {
+}: {
+  children: React.ReactNode;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -96,6 +100,4 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       {children}
     </AuthContext.Provider>
   );
-};
-
-export { AuthProvider };
+}
