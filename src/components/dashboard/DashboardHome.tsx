@@ -25,7 +25,7 @@ interface DashboardHomeProps {
 
 const DashboardHome = ({
   userName = "المستخدم",
-  userRole = "branch_manager",
+  userRole = "general_manager",
   lastLogin = "Today at 8:30 AM",
   activeUsers = 5,
 }: DashboardHomeProps) => {

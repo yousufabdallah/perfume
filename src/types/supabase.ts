@@ -347,10 +347,22 @@ export type Database = {
           email: string
           password: string
           full_name: string
-          user_role: Database["public"]["Enums"]["user_role"]
+          user_role: string
           branch_id: string
         }
-        Returns: string
+        Returns: Json
+      }
+      delete_branch: {
+        Args: {
+          branch_id: string
+        }
+        Returns: boolean
+      }
+      delete_user: {
+        Args: {
+          user_id: string
+        }
+        Returns: boolean
       }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
@@ -360,12 +372,38 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      insert_branch: {
+        Args: {
+          branch_name: string
+          branch_address: string
+          branch_phone: string
+        }
+        Returns: boolean
+      }
       is_branch_manager: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_general_manager: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      update_branch: {
+        Args: {
+          branch_id: string
+          branch_name: string
+          branch_address: string
+          branch_phone: string
+        }
+        Returns: boolean
+      }
+      update_user_with_role: {
+        Args: {
+          user_id: string
+          full_name: string
+          user_role: string
+          branch_id: string
+        }
         Returns: boolean
       }
     }

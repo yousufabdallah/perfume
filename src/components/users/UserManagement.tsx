@@ -152,51 +152,13 @@ const UserManagement = ({
     if (!currentUser) return;
 
     try {
-      // Prevent changing role to general manager if email is not the designated one
-      if (
-        formData.role === "general_manager" &&
-        currentUser.email !== "yousufabdallah2000@gmail.com"
-      ) {
-        throw new Error(
-          "Only yousufabdallah2000@gmail.com can be the general manager",
-        );
-      }
-
-      // Check if a general manager already exists when trying to change role to general manager
-      if (
-        formData.role === "general_manager" &&
-        currentUser.role !== "general_manager"
-      ) {
-        const { data: existingGM, error: gmError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("role", "general_manager");
-
-        if (gmError) throw gmError;
-        if (existingGM && existingGM.length > 0) {
-          throw new Error("A general manager already exists");
-        }
-      }
-
-      // Prevent changing the general manager's role if it's the designated email
-      if (
-        currentUser.email === "yousufabdallah2000@gmail.com" &&
-        currentUser.role === "general_manager" &&
-        formData.role !== "general_manager"
-      ) {
-        throw new Error(
-          "Cannot change the role of the designated general manager",
-        );
-      }
-
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: formData.full_name,
-          role: formData.role,
-          branch_id: formData.branch_id,
-        })
-        .eq("id", currentUser.id);
+      // Use the update_user_with_role function to update the user
+      const { data, error } = await supabase.rpc("update_user_with_role", {
+        user_id: currentUser.id,
+        full_name: formData.full_name,
+        user_role: formData.role,
+        branch_id: formData.branch_id,
+      });
 
       if (error) throw error;
       setEditDialogOpen(false);
@@ -212,20 +174,10 @@ const UserManagement = ({
     if (!currentUser) return;
 
     try {
-      // Prevent deleting the general manager if it's the designated email
-      if (
-        currentUser.email === "yousufabdallah2000@gmail.com" &&
-        currentUser.role === "general_manager"
-      ) {
-        throw new Error("Cannot delete the designated general manager");
-      }
-
-      // In a real app, you would need to delete the auth user as well
-      // This would typically be done via a server function
-      const { error } = await supabase
-        .from("users")
-        .delete()
-        .eq("id", currentUser.id);
+      // Use the delete_user function to delete the user
+      const { data, error } = await supabase.rpc("delete_user", {
+        user_id: currentUser.id,
+      });
 
       if (error) throw error;
       setDeleteDialogOpen(false);

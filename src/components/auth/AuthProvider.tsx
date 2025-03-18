@@ -66,6 +66,16 @@ export default function AuthProvider({
     // Execute the fetch session function immediately
     fetchSession();
 
+    // Set a timeout to ensure loading state is cleared even if the fetch fails
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.warn("Auth provider loading timeout reached");
+        setIsLoading(false);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);

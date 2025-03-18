@@ -6,9 +6,10 @@ import { useAuth } from "./auth/AuthProvider";
 import { signIn, signUp } from "@/lib/auth";
 
 const Home: React.FC = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, error: authContextError } = useAuth();
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authLoading, setAuthLoading] = React.useState<boolean>(false);
+  const [forceRender, setForceRender] = React.useState<boolean>(false);
 
   const handleLogin = async (values: { email: string; password: string }) => {
     setAuthLoading(true);
@@ -59,14 +60,15 @@ const Home: React.FC = () => {
     const timer = setTimeout(() => {
       if (isLoading) {
         console.log("Loading timeout reached, forcing render");
-        setAuthLoading(false);
+        setForceRender(true);
       }
-    }, 5000); // 5 second timeout
+    }, 3000); // 3 second timeout
 
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  if (isLoading) {
+  // If there's an error in the auth context or we've forced a render, show the login form
+  if (isLoading && !forceRender) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -75,9 +77,10 @@ const Home: React.FC = () => {
     );
   }
 
+  // If there was an error or we forced a render, show the login form
   return (
     <div className="min-h-screen bg-slate-50">
-      {user ? (
+      {user && !authContextError && !forceRender ? (
         <DashboardHome
           userName={user.user_metadata?.full_name || user.email.split("@")[0]}
           lastLogin="Today at 9:00 AM" // This would ideally come from your database
@@ -88,7 +91,9 @@ const Home: React.FC = () => {
           onLogin={handleLogin}
           onRegister={handleRegister}
           isLoading={authLoading}
-          error={authError}
+          error={
+            authError || (authContextError ? "حدث خطأ في تسجيل الدخول" : null)
+          }
         />
       )}
     </div>

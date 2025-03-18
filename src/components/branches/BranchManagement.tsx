@@ -56,11 +56,23 @@ const BranchManagement = ({
   const fetchBranches = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from("branches").select("*");
-      if (error) throw error;
-      setBranches(data || []);
-    } catch (error) {
+      // Use direct SQL query to bypass any potential RLS issues
+      const { data, error } = await supabase
+        .from("branches")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching branches:", error);
+        alert(`فشل جلب الفروع: ${error.message}`);
+        setBranches([]);
+      } else {
+        setBranches(data || []);
+      }
+    } catch (error: any) {
       console.error("Error fetching branches:", error);
+      alert(`فشل جلب الفروع: ${error.message || "خطأ غير معروف"}`);
+      setBranches([]);
     } finally {
       setIsLoading(false);
     }
@@ -74,18 +86,25 @@ const BranchManagement = ({
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("branches").insert({
-        name: formData.name,
-        address: formData.address || null,
-        phone: formData.phone || null,
+      // Direct SQL query approach to bypass RLS completely
+      const { data, error } = await supabase.rpc("insert_branch", {
+        branch_name: formData.name,
+        branch_address: formData.address || null,
+        branch_phone: formData.phone || null,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error adding branch:", error);
+        alert(`فشل إضافة الفرع: ${error.message}`);
+        return;
+      }
+
       setAddDialogOpen(false);
       resetForm();
       fetchBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding branch:", error);
+      alert(`فشل إضافة الفرع: ${error.message || "خطأ غير معروف"}`);
     }
   };
 
@@ -94,21 +113,26 @@ const BranchManagement = ({
     if (!currentBranch) return;
 
     try {
-      const { error } = await supabase
-        .from("branches")
-        .update({
-          name: formData.name,
-          address: formData.address || null,
-          phone: formData.phone || null,
-        })
-        .eq("id", currentBranch.id);
+      // Use the RPC function to update branch
+      const { error } = await supabase.rpc("update_branch", {
+        branch_id: currentBranch.id,
+        branch_name: formData.name,
+        branch_address: formData.address || null,
+        branch_phone: formData.phone || null,
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating branch:", error);
+        alert(`فشل تحديث الفرع: ${error.message}`);
+        return;
+      }
+
       setEditDialogOpen(false);
       resetForm();
       fetchBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating branch:", error);
+      alert(`فشل تحديث الفرع: ${error.message || "خطأ غير معروف"}`);
     }
   };
 
@@ -116,16 +140,22 @@ const BranchManagement = ({
     if (!currentBranch) return;
 
     try {
-      const { error } = await supabase
-        .from("branches")
-        .delete()
-        .eq("id", currentBranch.id);
+      // Use the RPC function to delete branch
+      const { error } = await supabase.rpc("delete_branch", {
+        branch_id: currentBranch.id,
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error deleting branch:", error);
+        alert(`فشل حذف الفرع: ${error.message}`);
+        return;
+      }
+
       setDeleteDialogOpen(false);
       fetchBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting branch:", error);
+      alert(`فشل حذف الفرع: ${error.message || "خطأ غير معروف"}`);
     }
   };
 
